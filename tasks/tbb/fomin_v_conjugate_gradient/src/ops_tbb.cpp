@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 double fomin_v_conjugate_gradient::FominVConjugateGradientTbb::DotProduct(const std::vector<double>& a,
@@ -18,7 +19,7 @@ double fomin_v_conjugate_gradient::FominVConjugateGradientTbb::DotProduct(const 
         }
         return init;
       },
-      std::plus<double>());
+      std::plus<>());
 }
 
 std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientTbb::MatrixVectorMultiply(
@@ -28,7 +29,7 @@ std::vector<double> fomin_v_conjugate_gradient::FominVConjugateGradientTbb::Matr
     for (int i = r.begin(); i < r.end(); ++i) {
       double temp = 0.0;
       for (int j = 0; j < n; ++j) {
-        temp += a[i * n + j] * x[j];
+        temp += a[(i * n) + j] * x[j];
       }
       result[i] = temp;
     }
