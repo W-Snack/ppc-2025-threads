@@ -13,8 +13,8 @@
 namespace {
 int Orientation(const shulpin_i_jarvis_omp::Point& p, const shulpin_i_jarvis_omp::Point& q,
                 const shulpin_i_jarvis_omp::Point& r) {
-  int val = static_cast<int>(((q.y - p.y) * (r.x - q.x)) - ((q.x - p.x) * (r.y - q.y)));
-  if (val == 0) {
+  double val = ((q.y - p.y) * (r.x - q.x)) - ((q.x - p.x) * (r.y - q.y));
+  if (std::fabs(val) < 1e-9) {
     return 0;
   }
   return (val > 0) ? 1 : 2;
@@ -81,66 +81,61 @@ bool shulpin_i_jarvis_omp::JarvisSequential::PostProcessingImpl() {
 
 void shulpin_i_jarvis_omp::JarvisOMPParallel::MakeJarvisPassageOMP(
     std::vector<shulpin_i_jarvis_omp::Point>& input_jar, std::vector<shulpin_i_jarvis_omp::Point>& output_jar) {
-  size_t total_size_t = input_jar.size();
-  auto total = static_cast<int32_t>(total_size_t);
+  int total = static_cast<int>(input_jar.size());
   output_jar.clear();
 
-  int32_t start = 0;
-#pragma omp parallel for
-  for (int32_t i = 0; i < total; ++i) {
-    int32_t candidate = i;
-    for (int32_t j = i + 1; j < total; ++j) {
-      if (input_jar[j].x < input_jar[candidate].x ||
-          (input_jar[j].x == input_jar[candidate].x && input_jar[j].y < input_jar[candidate].y)) {
-        candidate = j;
-      }
-    }
-
-#pragma omp critical
-    {
-      if (input_jar[candidate].x < input_jar[start].x ||
-          (input_jar[candidate].x == input_jar[start].x && input_jar[candidate].y < input_jar[start].y)) {
-        start = candidate;
-      }
-    }
-  }
-
-  int32_t active = start;
+  std::unordered_set<shulpin_i_jarvis_omp::Point, shulpin_i_jarvis_omp::PointHash, shulpin_i_jarvis_omp::PointEqual>
+      unique_points;
   std::vector<shulpin_i_jarvis_omp::Point> hull;
-  std::unordered_set<std::string> unique_points;
   hull.reserve(total);
 
+  int start = 0;
+  for (int i = 1; i < total; ++i) {
+    const auto& a = input_jar[i];
+    const auto& b = input_jar[start];
+    if (a.x < b.x || (a.x == b.x && a.y < b.y)) {
+      start = i;
+    }
+  }
+  int active = start;
+
   do {
-    std::string point_key = std::to_string(input_jar[active].x) + "," + std::to_string(input_jar[active].y);
-    if (unique_points.find(point_key) == unique_points.end()) {
-      hull.push_back(input_jar[active]);
-      unique_points.insert(point_key);
+    const Point& current = input_jar[active];
+    if (unique_points.find(current) == unique_points.end()) {
+      hull.push_back(current);
+      unique_points.insert(current);
     }
 
-    int32_t candidate = (active + 1) % total;
+    int candidate = (active + 1) % total;
+    std::vector<int> thread_candidates(omp_get_max_threads(), candidate);
 
 #pragma omp parallel
     {
-      int32_t local_candidate = candidate;
+      int tid = omp_get_thread_num();
+      int local_candidate = candidate;
 
 #pragma omp for nowait
-      for (int32_t index = 0; index < total; ++index) {
-        if (Orientation(input_jar[active], input_jar[index], input_jar[local_candidate]) == 2) {
-          local_candidate = index;
+      for (int i = 0; i < total; ++i) {
+        if (i == active) continue;
+        if (Orientation(current, input_jar[i], input_jar[local_candidate]) == 2) {
+          local_candidate = i;
         }
       }
 
-#pragma omp critical
-      {
-        if (Orientation(input_jar[active], input_jar[local_candidate], input_jar[candidate]) == 2) {
-          candidate = local_candidate;
-        }
+      thread_candidates[tid] = local_candidate;
+    }
+
+    for (int tid = 0; tid < static_cast<int>(thread_candidates.size()); ++tid) {
+      int cand = thread_candidates[tid];
+      if (Orientation(current, input_jar[cand], input_jar[candidate]) == 2) {
+        candidate = cand;
       }
     }
 
     if (candidate == active) {
       break;
     }
+
     active = candidate;
 
   } while (active != start);
