@@ -1,4 +1,4 @@
-﻿#include "omp/shlyakov_m_shell_sort_omp/include/ops_omp.hpp"
+﻿#include "omp/shlyakov_m_shell_sort/include/ops_omp.hpp"
 
 #include <omp.h>
 

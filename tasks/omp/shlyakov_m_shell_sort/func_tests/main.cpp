@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "core/task/include/task.hpp"
-#include "omp/shlyakov_m_shell_sort_omp/include/ops_omp.hpp"
+#include "omp/shlyakov_m_shell_sort/include/ops_omp.hpp"
 
 namespace {
 std::vector<int> GenerateRandomArray(size_t size) {
