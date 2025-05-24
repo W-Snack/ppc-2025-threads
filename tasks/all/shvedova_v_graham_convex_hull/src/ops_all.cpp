@@ -132,11 +132,10 @@ bool GrahamConvexHullALL::RunImpl() {
   MPI_Comm_size(MPI_COMM_WORLD, &worldsize);
   int processes = std::min(static_cast<int>(size), worldsize);
 
-  MPI_Comm group{};
   if (rank_ >= processes) {
-    MPI_Comm_split(MPI_COMM_WORLD, 1, rank_, &group);
     return true;
   }
+  MPI_Comm group{};
   MPI_Comm_split(MPI_COMM_WORLD, 0, rank_, &group);
 
   Point pivot{};
@@ -186,6 +185,8 @@ bool GrahamConvexHullALL::RunImpl() {
       break;
     }
   }
+
+  MPI_Comm_free(&group);
 
   if (rank_ == 0) {
     res_.push_back(procinput_[0]);
