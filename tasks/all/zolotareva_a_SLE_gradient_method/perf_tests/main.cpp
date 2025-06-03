@@ -32,7 +32,7 @@ void zolotareva_a_sle_gradient_method_all::GenerateSle(std::vector<double> &a, s
 
 TEST(sequential_zolotareva_a_sle_gradient_method_all, test_pipeline_run) {
   boost::mpi::communicator world;
-  const int n = 1000;
+  const int n = 1200;
   std::vector<double> a(n * n);
   std::vector<double> b(n);
   std::vector<double> x(n);
@@ -85,7 +85,7 @@ TEST(sequential_zolotareva_a_sle_gradient_method_all, test_pipeline_run) {
 
 TEST(sequential_zolotareva_a_sle_gradient_method_all, test_task_run) {
   boost::mpi::communicator world;
-  const int n = 1000;
+  const int n = 1200;
   std::vector<double> a(n * n);
   std::vector<double> b(n);
   std::vector<double> x(n);
