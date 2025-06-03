@@ -32,19 +32,17 @@ class CCSALL : public ppc::core::Task {
   static int GetElementsCount(int index, const std::vector<int>& columns_sum);
   static std::vector<double> ConvertFromSparse(const Sparse& matrix);
   static int CalculateStartIndex(int index, const std::vector<int>& columns_sum);
+  static double Accumulate(int i_index, int j_index, const Sparse& matrix1, const Sparse& matrix2);
   void GetDisplacements();
   void CollectSizes();
-  void CollectData();
-  void AddData(const std::vector<double>& data, int past_data, int index);
 
   Sparse A_;
   Sparse B_;
   Sparse Answer_;
   Sparse Process_data_;
-  int resize_data_;
+  std::vector<int> elements_sizes_;
   boost::mpi::communicator world_;
   std::vector<int> displ_;
-  std::vector<double> sending_data_;
   std::vector<int> sum_sizes_;
 
  public:

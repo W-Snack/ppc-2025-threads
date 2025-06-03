@@ -17,8 +17,8 @@ std::vector<double> ZeroEdges(std::vector<double> img, int wdth, int hght) {
     img[((hght - 1) * wdth) + i] = 0;
   }
   for (int i = 1; i < hght - 1; ++i) {
-    img[i * wdth] = 0.75;
-    img[(i * wdth) + wdth - 1] = 0.75;
+    img[i * wdth] = 0;
+    img[(i * wdth) + wdth - 1] = 0;
   }
 
   return img;
@@ -107,20 +107,22 @@ TEST(sozonov_i_image_filtering_block_partitioning_all, test_wrong_pixels) {
   }
 }
 
-TEST(sozonov_i_image_filtering_block_partitioning_all, test_13x3) {
+TEST(sozonov_i_image_filtering_block_partitioning_all, test_4x13) {
   boost::mpi::communicator world;
 
-  const int width = 13;
-  const int height = 3;
+  const int width = 4;
+  const int height = 13;
 
   // Create data
-  std::vector<double> in = {34,  24, 27, 67, 42, 48, 93, 26,  47, 2,  34, 13, 81, 24, 32, 12, 34, 72, 112, 16,
-                            123, 54, 32, 45, 67, 23, 76, 154, 52, 78, 94, 10, 23, 54, 93, 56, 23, 56, 72};
+  std::vector<double> in = {34,  24, 27,  67, 42, 48,  93, 26, 47, 2,   34, 13, 81,  24, 32, 12, 34, 72,
+                            112, 16, 123, 54, 32, 45,  67, 23, 76, 154, 52, 78, 94,  10, 23, 54, 93, 56,
+                            23,  56, 72,  1,  14, 145, 76, 23, 21, 45,  23, 56, 111, 23, 45, 23};
   std::vector<double> out(width * height, 0);
-  std::vector<double> ans = {0,    0,  0,       0,       0,       0,       0,       0,       0,  0,
-                             0,    0,  0,       34.875,  46.5625, 41.3125, 50.5625, 65.9375, 62, 56.5,
-                             65.5, 59, 39.9375, 38.6875, 47,      37.5625, 0,       0,       0,  0,
-                             0,    0,  0,       0,       0,       0,       0,       0,       0};
+  std::vector<double> ans = {0, 0,       0,       0, 0, 41,      46.75,   0, 0, 35.125,  32.875,  0,
+                             0, 43.5625, 37.1875, 0, 0, 62.75,   55.4375, 0, 0, 62.8125, 60.4375, 0,
+                             0, 58.9375, 68.5625, 0, 0, 63.5625, 73.5625, 0, 0, 59.8125, 66.8125, 0,
+                             0, 63.625,  63.625,  0, 0, 68.8125, 61.75,   0, 0, 53.125,  46.875,  0,
+                             0, 0,       0,       0};
 
   // Create task_data
   auto task_data_all = std::make_shared<ppc::core::TaskData>();
@@ -146,20 +148,19 @@ TEST(sozonov_i_image_filtering_block_partitioning_all, test_13x3) {
   }
 }
 
-TEST(sozonov_i_image_filtering_block_partitioning_all, test_15x5) {
+TEST(sozonov_i_image_filtering_block_partitioning_all, test_5x15) {
   boost::mpi::communicator world;
 
-  const int width = 15;
-  const int height = 5;
+  const int width = 5;
+  const int height = 15;
 
   // Create data
   std::vector<double> in(width * height);
   std::iota(in.begin(), in.end(), 0);
   std::vector<double> out(width * height, 0);
-  std::vector<double> ans = {0,  0,  0,  0,  0,  0,  0,     0,  0,  0,  0,    0,     0,  0,  0,  11.5, 16, 17, 18,
-                             19, 20, 21, 22, 23, 24, 25,    26, 27, 28, 21.5, 22.75, 31, 32, 33, 34,   35, 36, 37,
-                             38, 39, 40, 41, 42, 43, 32.75, 34, 46, 47, 48,   49,    50, 51, 52, 53,   54, 55, 56,
-                             57, 58, 44, 0,  0,  0,  0,     0,  0,  0,  0,    0,     0,  0,  0,  0,    0,  0};
+  std::vector<double> ans = {0, 0,  0,  0,  0, 0, 6,  7,  8,  0, 0, 11, 12, 13, 0, 0, 16, 17, 18, 0, 0, 21, 22, 23, 0,
+                             0, 26, 27, 28, 0, 0, 31, 32, 33, 0, 0, 36, 37, 38, 0, 0, 41, 42, 43, 0, 0, 46, 47, 48, 0,
+                             0, 51, 52, 53, 0, 0, 56, 57, 58, 0, 0, 61, 62, 63, 0, 0, 66, 67, 68, 0, 0, 0,  0,  0,  0};
 
   // Create task_data
   auto task_data_all = std::make_shared<ppc::core::TaskData>();
@@ -185,20 +186,19 @@ TEST(sozonov_i_image_filtering_block_partitioning_all, test_15x5) {
   }
 }
 
-TEST(sozonov_i_image_filtering_block_partitioning_all, test_16x4) {
+TEST(sozonov_i_image_filtering_block_partitioning_all, test_4x16) {
   boost::mpi::communicator world;
 
-  const int width = 16;
-  const int height = 4;
+  const int width = 4;
+  const int height = 16;
 
   // Create data
   std::vector<double> in(width * height);
   std::iota(in.begin(), in.end(), 0);
   std::vector<double> out(width * height, 0);
-  std::vector<double> ans = {0,     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-                             12.25, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 23,
-                             24.25, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 35,
-                             0,     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0};
+  std::vector<double> ans = {0,  0,  0,  0,  0,  5,  6,  0,  0,  9,  10, 0,  0,  13, 14, 0,  0,  17, 18, 0,  0,  21,
+                             22, 0,  0,  25, 26, 0,  0,  29, 30, 0,  0,  33, 34, 0,  0,  37, 38, 0,  0,  41, 42, 0,
+                             0,  45, 46, 0,  0,  49, 50, 0,  0,  53, 54, 0,  0,  57, 58, 0,  0,  0,  0,  0};
 
   // Create task_data
   auto task_data_all = std::make_shared<ppc::core::TaskData>();
@@ -224,19 +224,19 @@ TEST(sozonov_i_image_filtering_block_partitioning_all, test_16x4) {
   }
 }
 
-TEST(sozonov_i_image_filtering_block_partitioning_all, test_17x3) {
+TEST(sozonov_i_image_filtering_block_partitioning_all, test_4x17) {
   boost::mpi::communicator world;
 
-  const int width = 17;
-  const int height = 3;
+  const int width = 4;
+  const int height = 17;
 
   // Create data
   std::vector<double> in(width * height);
   std::iota(in.begin(), in.end(), 0);
   std::vector<double> out(width * height, 0);
-  std::vector<double> ans = {0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-                             13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 24.5,
-                             0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0};
+  std::vector<double> ans = {0,  0, 0,  0,  0,  5, 6,  0,  0,  9, 10, 0,  0,  13, 14, 0,  0,  17, 18, 0,  0, 21, 22,
+                             0,  0, 25, 26, 0,  0, 29, 30, 0,  0, 33, 34, 0,  0,  37, 38, 0,  0,  41, 42, 0, 0,  45,
+                             46, 0, 0,  49, 50, 0, 0,  53, 54, 0, 0,  57, 58, 0,  0,  61, 62, 0,  0,  0,  0, 0};
 
   // Create task_data
   auto task_data_all = std::make_shared<ppc::core::TaskData>();
