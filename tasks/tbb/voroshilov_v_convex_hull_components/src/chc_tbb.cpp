@@ -1,7 +1,6 @@
 #include "../include/chc_tbb.hpp"
 
 #include <algorithm>
-#include <utility>
 #include <vector>
 
 #include "../include/chc.hpp"
@@ -19,37 +18,33 @@ bool voroshilov_v_convex_hull_components_tbb::ChcTaskTBB::ValidationImpl() {
 
 bool voroshilov_v_convex_hull_components_tbb::ChcTaskTBB::PreProcessingImpl() {
   int *ptr = reinterpret_cast<int *>(task_data->inputs[0]);
-  int height = *ptr;
+  height_in_ = *ptr;
 
   ptr = reinterpret_cast<int *>(task_data->inputs[1]);
-  int width = *ptr;
+  width_in_ = *ptr;
 
-  std::vector<int> pixels(task_data->inputs_count[0]);
+  pixels_in_.resize(task_data->inputs_count[0]);
   ptr = reinterpret_cast<int *>(task_data->inputs[2]);
-  std::ranges::copy(ptr, ptr + task_data->inputs_count[0], pixels.begin());
-
-  Image image(height, width, pixels);
-  imageIn_ = image;
+  std::ranges::copy(ptr, ptr + task_data->inputs_count[0], pixels_in_.begin());
 
   return true;
 }
 
 bool voroshilov_v_convex_hull_components_tbb::ChcTaskTBB::RunImpl() {
-  std::vector<Component> components = FindComponentsTBB(imageIn_);
+  Image image(height_in_, width_in_, pixels_in_);
 
-  hullsOut_ = QuickHullAllTBB(components);
+  std::vector<Component> components = FindComponentsTBB(image);
+
+  hulls_out_ = QuickHullAllTBB(components);
 
   return true;
 }
 
 bool voroshilov_v_convex_hull_components_tbb::ChcTaskTBB::PostProcessingImpl() {
-  std::pair<std::vector<int>, std::vector<int>> packed_out = PackHulls(hullsOut_, imageIn_);
-  std::vector<int> hulls_indexes = packed_out.first;
-  std::vector<int> pixels_indexes = packed_out.second;
-
-  std::ranges::copy(hulls_indexes, reinterpret_cast<int *>(task_data->outputs[0]));
-  std::ranges::copy(pixels_indexes, reinterpret_cast<int *>(task_data->outputs[1]));
-  task_data->outputs_count[0] = hullsOut_.size();
+  int *hulls_indxs = reinterpret_cast<int *>(task_data->outputs[0]);
+  int *pixels_indxs = reinterpret_cast<int *>(task_data->outputs[1]);
+  PackHulls(hulls_out_, width_in_, height_in_, hulls_indxs, pixels_indxs);
+  task_data->outputs_count[0] = hulls_out_.size();
 
   return true;
 }

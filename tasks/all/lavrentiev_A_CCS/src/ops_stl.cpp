@@ -70,29 +70,16 @@ lavrentiev_a_ccs_all::Sparse lavrentiev_a_ccs_all::CCSALL::MatMul(const Sparse &
   temporary_matrix.columnsSum.resize(matrix2.size.second);
   temporary_matrix.elements.resize(resize_data);
   temporary_matrix.rows.resize(resize_data);
-  auto accumulate = [&](int i_index, int j_index) {
-    double sum = 0.0;
-    for (int x = 0; x < GetElementsCount(j_index, matrix1.columnsSum); x++) {
-      for (int y = 0; y < GetElementsCount(i_index, matrix2.columnsSum); y++) {
-        if (matrix1.rows[CalculateStartIndex(j_index, matrix1.columnsSum) + x] ==
-            matrix2.rows[CalculateStartIndex(i_index, matrix2.columnsSum) + y]) {
-          sum += matrix1.elements[x + CalculateStartIndex(j_index, matrix1.columnsSum)] *
-                 matrix2.elements[y + CalculateStartIndex(i_index, matrix2.columnsSum)];
-        }
-      }
-    }
-    return sum;
-  };
   auto matrix_multiplicator = [&](int begin, int end) {
     for (int i = begin; i != end; ++i) {
       if (temporary_matrix.columnsSum[i] == 0) {
         temporary_matrix.columnsSum[i]++;
       }
       for (int j = 0; j < static_cast<int>(matrix1.columnsSum.size()); ++j) {
-        double s = accumulate(i, j);
+        double s = Accumulate(i, j, matrix1, matrix2);
         if (s != 0) {
           temporary_matrix.elements[(i * matrix2.size.second) + j] = s;
-          temporary_matrix.rows[(i * matrix2.size.second) + j] = j + 1;
+          temporary_matrix.rows[(i * matrix2.size.second) + j] = j;
           temporary_matrix.columnsSum[i]++;
         }
       }
@@ -110,10 +97,17 @@ lavrentiev_a_ccs_all::Sparse lavrentiev_a_ccs_all::CCSALL::MatMul(const Sparse &
     }
   }
   std::ranges::for_each(threads, [&](std::thread &thread) { thread.join(); });
-  return {.size = temporary_matrix.size,
-          .elements = temporary_matrix.elements,
-          .rows = temporary_matrix.rows,
-          .columnsSum = temporary_matrix.columnsSum};
+  std::vector<double> elements;
+  std::vector<int> rows;
+  elements.reserve(resize_data / 10);
+  rows.reserve(resize_data / 10);
+  for (int i = 0; i < resize_data; ++i) {
+    if (temporary_matrix.elements[i] != 0.0) {
+      elements.emplace_back(temporary_matrix.elements[i]);
+      rows.emplace_back(temporary_matrix.rows[i]);
+    }
+  }
+  return {.size = temporary_matrix.size, .elements = elements, .rows = rows, .columnsSum = temporary_matrix.columnsSum};
 }
 
 int lavrentiev_a_ccs_all::CCSALL::GetElementsCount(int index, const std::vector<int> &columns_sum) {
@@ -153,6 +147,20 @@ void lavrentiev_a_ccs_all::CCSALL::GetDisplacements() {
   }
   displ_.emplace_back(static_cast<int>(B_.columnsSum.size()));
 }
+double lavrentiev_a_ccs_all::CCSALL::Accumulate(int i_index, int j_index, const Sparse &matrix1,
+                                                const Sparse &matrix2) {
+  double sum = 0.0;
+  for (int x = 0; x < GetElementsCount(j_index, matrix1.columnsSum); x++) {
+    for (int y = 0; y < GetElementsCount(i_index, matrix2.columnsSum); y++) {
+      int m1_start_index = CalculateStartIndex(j_index, matrix1.columnsSum);
+      int m2_start_index = CalculateStartIndex(i_index, matrix2.columnsSum);
+      if (matrix1.rows[m1_start_index + x] == matrix2.rows[m2_start_index + y]) {
+        sum += matrix1.elements[x + m1_start_index] * matrix2.elements[y + m2_start_index];
+      }
+    }
+  }
+  return sum;
+}
 
 bool lavrentiev_a_ccs_all::CCSALL::PreProcessingImpl() {
   if (world_.rank() == 0) {
@@ -180,10 +188,13 @@ bool lavrentiev_a_ccs_all::CCSALL::IsEmpty() const {
 void lavrentiev_a_ccs_all::CCSALL::CollectSizes() {
   if (world_.rank() != 0) {
     world_.send(0, 1, static_cast<int>(Process_data_.columnsSum.size()));
+    world_.send(0, 0, static_cast<int>(Process_data_.elements.size()));
   } else {
     sum_sizes_.resize(world_.size(), static_cast<int>(Process_data_.columnsSum.size()));
+    elements_sizes_.resize(world_.size(), static_cast<int>(Process_data_.elements.size()));
     for (int i = 1; i < world_.size(); ++i) {
       world_.recv(i, 1, sum_sizes_[i]);
+      world_.recv(i, 0, elements_sizes_[i]);
     }
   }
 }
@@ -196,17 +207,6 @@ bool lavrentiev_a_ccs_all::CCSALL::ValidationImpl() {
   return true;
 }
 
-void lavrentiev_a_ccs_all::CCSALL::CollectData() {
-  sending_data_ = std::move(Process_data_.elements);
-  sending_data_.resize(Process_data_.columnsSum.size() + (2 * resize_data_));
-  for (int i = 0; i < resize_data_; i++) {
-    sending_data_[i + resize_data_] = static_cast<double>(Process_data_.rows[i]);
-    if (i < static_cast<int>(Process_data_.columnsSum.size())) {
-      sending_data_[i + (2 * resize_data_)] = static_cast<double>(Process_data_.columnsSum[i]);
-    }
-  }
-}
-
 bool lavrentiev_a_ccs_all::CCSALL::RunImpl() {
   boost::mpi::broadcast(world_, displ_, 0);
   boost::mpi::broadcast(world_, A_, 0);
@@ -214,34 +214,24 @@ bool lavrentiev_a_ccs_all::CCSALL::RunImpl() {
   if (displ_.empty()) {
     return true;
   }
-  resize_data_ = static_cast<int>(B_.columnsSum.size() * A_.columnsSum.size());
   Process_data_ = MatMul(A_, B_, displ_[world_.rank()], displ_[world_.rank() + 1]);
   CollectSizes();
-  CollectData();
   if (world_.rank() == 0) {
     Answer_.columnsSum.clear();
-    Answer_.rows.clear();
     Answer_.elements.clear();
-    Answer_.elements.reserve(resize_data_);
-    Answer_.rows.reserve(resize_data_);
-    Answer_.columnsSum.reserve(resize_data_);
-    std::vector<double> data_reader((resize_data_ * world_.size() * 2) +
-                                    std::accumulate(sum_sizes_.begin(), sum_sizes_.end(), 0));
-    std::vector<int> size(world_.size(), resize_data_ * 2);
-    for (int i = 0; i < world_.size(); ++i) {
-      size[i] += sum_sizes_[i];
-    }
-    boost::mpi::gatherv(world_, sending_data_, data_reader.data(), size, 0);
-    int process_data_num = 0;
-    int sum_by_elements_count = sum_sizes_.front();
-    int past_data = 0;
-    for (int i = 0; i < static_cast<int>(data_reader.size()); ++i) {
-      if (i == (resize_data_ * 2 * (process_data_num + 1)) + sum_by_elements_count) {
-        past_data += (resize_data_ * 2) + sum_sizes_[process_data_num];
-        process_data_num++;
-        sum_by_elements_count += sum_sizes_[process_data_num];
+    Answer_.rows.clear();
+    std::vector<int> columns_nums_collector(B_.columnsSum.size() * world_.size());
+    auto size = std::accumulate(elements_sizes_.begin(), elements_sizes_.end(), 0);
+    Answer_.elements.resize(size);
+    Answer_.rows.resize(size);
+    Answer_.columnsSum.reserve(B_.columnsSum.size());
+    boost::mpi::gatherv(world_, Process_data_.elements, Answer_.elements.data(), elements_sizes_, 0);
+    boost::mpi::gatherv(world_, Process_data_.rows, Answer_.rows.data(), elements_sizes_, 0);
+    boost::mpi::gatherv(world_, Process_data_.columnsSum, columns_nums_collector.data(), sum_sizes_, 0);
+    for (auto &column_sum : columns_nums_collector) {
+      if (column_sum != 0) {
+        Answer_.columnsSum.emplace_back(column_sum - 1);
       }
-      AddData(data_reader, past_data, i);
     }
     for (size_t i = 1; i < Answer_.columnsSum.size(); ++i) {
       Answer_.columnsSum[i] = Answer_.columnsSum[i] + Answer_.columnsSum[i - 1];
@@ -249,25 +239,11 @@ bool lavrentiev_a_ccs_all::CCSALL::RunImpl() {
     Answer_.size.first = B_.size.second;
     Answer_.size.second = B_.size.second;
   } else {
-    boost::mpi::gatherv(world_, sending_data_, 0);
+    boost::mpi::gatherv(world_, Process_data_.elements, 0);
+    boost::mpi::gatherv(world_, Process_data_.rows, 0);
+    boost::mpi::gatherv(world_, Process_data_.columnsSum, 0);
   }
   return true;
-}
-
-void lavrentiev_a_ccs_all::CCSALL::AddData(const std::vector<double> &data, int past_data, int index) {
-  if (index - ((resize_data_ * 2) + past_data) < 0) {
-    if (index - (resize_data_ + past_data) < 0 && data[index] != 0.0) {
-      Answer_.elements.emplace_back(data[index]);
-    } else {
-      if (data[index] != 0.0) {
-        Answer_.rows.emplace_back(data[index] - 1);
-      }
-    }
-  } else {
-    if (data[index] != 0.0) {
-      Answer_.columnsSum.emplace_back(data[index] - 1);
-    }
-  }
 }
 
 bool lavrentiev_a_ccs_all::CCSALL::PostProcessingImpl() {

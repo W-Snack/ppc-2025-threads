@@ -11,7 +11,7 @@
 #include "omp/kharin_m_multidimensional_integral_calc/include/ops_omp.hpp"
 
 TEST(kharin_m_multidimensional_integral_calc_omp, test_pipeline_run) {
-  constexpr size_t kDim = 5000;
+  constexpr size_t kDim = 10000;
 
   std::vector<double> in(kDim * kDim, 1.0);
   std::vector<size_t> grid_sizes = {kDim, kDim};
@@ -33,7 +33,7 @@ TEST(kharin_m_multidimensional_integral_calc_omp, test_pipeline_run) {
       std::make_shared<kharin_m_multidimensional_integral_calc_omp::TestTaskOpenMP>(task_data_seq);
 
   auto perf_attr = std::make_shared<ppc::core::PerfAttr>();
-  perf_attr->num_running = 30;  // Количество запусков для усреднения
+  perf_attr->num_running = 30;
   const double t0 = omp_get_wtime();
   perf_attr->current_timer = [t0] { return omp_get_wtime() - t0; };
 
@@ -47,7 +47,7 @@ TEST(kharin_m_multidimensional_integral_calc_omp, test_pipeline_run) {
 }
 
 TEST(kharin_m_multidimensional_integral_calc_omp, test_task_run) {
-  constexpr size_t kDim = 5000;
+  constexpr size_t kDim = 10000;
 
   std::vector<double> in(kDim * kDim, 1.0);
   std::vector<size_t> grid_sizes = {kDim, kDim};
@@ -69,7 +69,7 @@ TEST(kharin_m_multidimensional_integral_calc_omp, test_task_run) {
       std::make_shared<kharin_m_multidimensional_integral_calc_omp::TestTaskOpenMP>(task_data_seq);
 
   auto perf_attr = std::make_shared<ppc::core::PerfAttr>();
-  perf_attr->num_running = 30;  // Количество запусков для усреднения
+  perf_attr->num_running = 30;
   const double t0 = omp_get_wtime();
   perf_attr->current_timer = [t0] { return omp_get_wtime() - t0; };
 

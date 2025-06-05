@@ -1,7 +1,6 @@
 #include "../include/chc.hpp"
 
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <stack>
@@ -228,16 +227,6 @@ std::vector<Component> voroshilov_v_convex_hull_components_tbb::FindComponentsTB
 
   MergeComponentsAcrossAreas(components, tmp_image, area_height, end_y);
 
-  int size = static_cast<int>(components.size());
-
-  arena.execute([&] {
-    oneapi::tbb::parallel_for(0, size, [&](int i) {
-      std::ranges::sort(components[i], [](const Pixel& p1, const Pixel& p2) {
-        return (p1.y < p2.y || (p1.y == p2.y && p1.x < p2.x));
-      });
-    });
-  });
-
   return components;
 }
 
@@ -274,10 +263,10 @@ std::vector<Pixel> voroshilov_v_convex_hull_components_tbb::QuickHull(Component&
   Pixel right = component[0];
 
   for (Pixel& pixel : component) {
-    if (pixel.x < left.x) {
+    if ((pixel.x < left.x) || (pixel.x == left.x && pixel.y < left.y)) {
       left = pixel;
     }
-    if (pixel.x > right.x) {
+    if ((pixel.x > right.x) || (pixel.x == right.x && pixel.y > right.y)) {
       right = pixel;
     }
   }
@@ -336,36 +325,22 @@ std::vector<Hull> voroshilov_v_convex_hull_components_tbb::QuickHullAllTBB(std::
   return hulls;
 }
 
-std::pair<std::vector<int>, std::vector<int>> voroshilov_v_convex_hull_components_tbb::PackHulls(
-    std::vector<Hull>& hulls, Image& image) {
-  int height = image.height;
-  int width = image.width;
+void voroshilov_v_convex_hull_components_tbb::PackHulls(std::vector<Hull>& hulls, int width, int height,
+                                                        int* hulls_indxs, int* pixels_indxs) {
+  std::fill(hulls_indxs, hulls_indxs + (height * width), 0);
+  std::fill(pixels_indxs, pixels_indxs + (height * width), 0);
 
-  std::vector<int> hulls_indexes(height * width, 0);
-  std::vector<int> pixels_indexes(height * width, 0);
-
-  int hulls_size = static_cast<int>(hulls.size());
-  std::atomic<int> uniq_hull_index(1);
-
-  int num_threads = ppc::util::GetPPCNumThreads();
-  oneapi::tbb::task_arena arena(num_threads);
-
-  arena.execute([&] {
-    oneapi::tbb::parallel_for(0, hulls_size, [&](int i) {
-      int pixel_index = 1;
-      int pixels_size = static_cast<int>(hulls[i].size());
-      int hull_index = uniq_hull_index.fetch_add(1);
-
-      for (int j = 0; j < pixels_size; j++) {
-        hulls_indexes[(hulls[i][j].y * width) + hulls[i][j].x] = hull_index;
-        pixels_indexes[(hulls[i][j].y * width) + hulls[i][j].x] = pixel_index;
-        pixel_index++;
-      }
-    });
-  });
-
-  std::pair<std::vector<int>, std::vector<int>> packed_vectors(hulls_indexes, pixels_indexes);
-  return packed_vectors;
+  int hull_index = 1;
+  for (Hull& hull : hulls) {
+    int pixel_index = 1;
+    for (Pixel& p : hull) {
+      int pos = (p.y * width) + p.x;
+      hulls_indxs[pos] = hull_index;
+      pixels_indxs[pos] = pixel_index;
+      pixel_index++;
+    }
+    hull_index++;
+  }
 }
 
 std::vector<Hull> voroshilov_v_convex_hull_components_tbb::UnpackHulls(std::vector<int>& hulls_indexes,

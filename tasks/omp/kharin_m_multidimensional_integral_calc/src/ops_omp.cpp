@@ -26,11 +26,9 @@ bool kharin_m_multidimensional_integral_calc_omp::TestTaskOpenMP::PreProcessingI
   auto* sizes_ptr = reinterpret_cast<size_t*>(task_data->inputs[1]);
   grid_sizes_ = std::vector<size_t>(sizes_ptr, sizes_ptr + d);
 
-  // Вычисляем общее количество точек сетки
+  // Вычисляем общее количество точек сетки ПОСЛЕДОВАТЕЛЬНО
   size_t total_size = 1;
-
-#pragma omp parallel for reduction(* : total_size)
-  for (int i = 0; i < static_cast<int>(grid_sizes_.size()); i++) {
+  for (size_t i = 0; i < grid_sizes_.size(); i++) {
     total_size *= grid_sizes_[i];
   }
 
@@ -46,35 +44,29 @@ bool kharin_m_multidimensional_integral_calc_omp::TestTaskOpenMP::PreProcessingI
   auto* steps_ptr = reinterpret_cast<double*>(task_data->inputs[2]);
   step_sizes_ = std::vector<double>(steps_ptr, steps_ptr + d);
 
-  bool is_valid = true;
-
-#pragma omp parallel for reduction(&& : is_valid)
-  for (int i = 0; i < static_cast<int>(step_sizes_.size()); i++) {
-    if (step_sizes_[i] <= 0.0) {
-      is_valid = false;
+  // Проверяем шаги ПОСЛЕДОВАТЕЛЬНО (слишком мало итераций для параллелизма)
+  for (const auto& step : step_sizes_) {
+    if (step <= 0.0) {
+      return false;
     }
   }
 
-  if (is_valid) {
-    output_result_ = 0.0;
-    return true;
-  }
-  return false;
+  output_result_ = 0.0;
+  return true;
 }
 
 bool kharin_m_multidimensional_integral_calc_omp::TestTaskOpenMP::RunImpl() {
-  // Вычисляем сумму всех значений функции
+  // ОСНОВНАЯ ПАРАЛЛЕЛИЗАЦИЯ
   double total = 0.0;
 #pragma omp parallel for reduction(+ : total)
   for (int i = 0; i < static_cast<int>(input_.size()); i++) {
     total += input_[i];
   }
 
-  // Вычисляем элемент объема как произведение шагов интегрирования
+  // Вычисляем элемент объема ПОСЛЕДОВАТЕЛЬНО
   double volume_element = 1.0;
-#pragma omp parallel for reduction(* : volume_element)
-  for (int i = 0; i < static_cast<int>(step_sizes_.size()); i++) {
-    volume_element *= step_sizes_[i];
+  for (const auto& step : step_sizes_) {
+    volume_element *= step;
   }
 
   output_result_ = total * volume_element;

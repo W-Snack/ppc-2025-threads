@@ -222,13 +222,6 @@ std::vector<Component> voroshilov_v_convex_hull_components_all::FindComponentsOM
 
   MergeComponentsAcrossAreas(components, image, area_height, end_y);
 
-  int size = static_cast<int>(components.size());
-#pragma omp parallel for schedule(dynamic)
-  for (int i = 0; i < size; i++) {
-    std::ranges::sort(components[i],
-                      [](const Pixel& p1, const Pixel& p2) { return (p1.y < p2.y || (p1.y == p2.y && p1.x < p2.x)); });
-  }
-
   return components;
 }
 
@@ -265,10 +258,10 @@ std::vector<Pixel> voroshilov_v_convex_hull_components_all::QuickHull(Component&
   Pixel right = component[0];
 
   for (Pixel& pixel : component) {
-    if (pixel.x < left.x) {
+    if ((pixel.x < left.x) || (pixel.x == left.x && pixel.y < left.y)) {
       left = pixel;
     }
-    if (pixel.x > right.x) {
+    if ((pixel.x > right.x) || (pixel.x == right.x && pixel.y > right.y)) {
       right = pixel;
     }
   }

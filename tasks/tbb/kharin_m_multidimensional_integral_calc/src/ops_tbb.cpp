@@ -28,15 +28,11 @@ bool kharin_m_multidimensional_integral_calc_tbb::TestTaskTBB::PreProcessingImpl
   auto* sizes_ptr = reinterpret_cast<size_t*>(task_data->inputs[1]);
   grid_sizes_ = std::vector<size_t>(sizes_ptr, sizes_ptr + d);
 
-  size_t total_size = tbb::parallel_reduce(
-      tbb::blocked_range<size_t>(0, grid_sizes_.size()), size_t(1),
-      [&](const tbb::blocked_range<size_t>& r, size_t local_prod) -> size_t {
-        for (size_t i = r.begin(); i != r.end(); ++i) {
-          local_prod *= grid_sizes_[i];
-        }
-        return local_prod;
-      },
-      std::multiplies<>());
+  // Вычисляем общее количество точек ПОСЛЕДОВАТЕЛЬНО (мало итераций)
+  size_t total_size = 1;
+  for (size_t i = 0; i < grid_sizes_.size(); i++) {
+    total_size *= grid_sizes_[i];
+  }
 
   if (task_data->inputs_count[0] != total_size) {
     return false;
@@ -50,29 +46,19 @@ bool kharin_m_multidimensional_integral_calc_tbb::TestTaskTBB::PreProcessingImpl
   auto* steps_ptr = reinterpret_cast<double*>(task_data->inputs[2]);
   step_sizes_ = std::vector<double>(steps_ptr, steps_ptr + d);
 
-  bool is_valid = tbb::parallel_reduce(
-      tbb::blocked_range<size_t>(0, step_sizes_.size()), true,
-      [&](const tbb::blocked_range<size_t>& r, bool local_is_valid) -> bool {
-        if (!local_is_valid) {
-          return false;
-        }
-        for (size_t i = r.begin(); i != r.end(); ++i) {
-          if (step_sizes_[i] <= 0.0) {
-            return false;
-          }
-        }
-        return true;
-      },
-      std::logical_and<>());
-
-  if (is_valid) {
-    output_result_ = 0.0;
-    return true;
+  // Проверяем шаги ПОСЛЕДОВАТЕЛЬНО (мало итераций)
+  for (const auto& step : step_sizes_) {
+    if (step <= 0.0) {
+      return false;
+    }
   }
-  return false;
+
+  output_result_ = 0.0;
+  return true;
 }
 
 bool kharin_m_multidimensional_integral_calc_tbb::TestTaskTBB::RunImpl() {
+  // ОСНОВНАЯ ПАРАЛЛЕЛИЗАЦИЯ - здесь много работы!
   double total = tbb::parallel_reduce(
       tbb::blocked_range<size_t>(0, input_.size()), 0.0,
       [&](const tbb::blocked_range<size_t>& r, double local_sum) -> double {
@@ -83,15 +69,11 @@ bool kharin_m_multidimensional_integral_calc_tbb::TestTaskTBB::RunImpl() {
       },
       std::plus<>());
 
-  double volume_element = tbb::parallel_reduce(
-      tbb::blocked_range<size_t>(0, step_sizes_.size()), 1.0,
-      [&](const tbb::blocked_range<size_t>& r, double local_prod) -> double {
-        for (size_t i = r.begin(); i != r.end(); ++i) {
-          local_prod *= step_sizes_[i];
-        }
-        return local_prod;
-      },
-      std::multiplies<>());
+  // Вычисляем элемент объема ПОСЛЕДОВАТЕЛЬНО (мало итераций)
+  double volume_element = 1.0;
+  for (const auto& step : step_sizes_) {
+    volume_element *= step;
+  }
 
   output_result_ = total * volume_element;
   return true;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <utility>
 #include <vector>
 
 namespace voroshilov_v_convex_hull_components_seq {
@@ -66,7 +65,7 @@ std::vector<Pixel> QuickHull(Component& component);
 
 std::vector<Hull> QuickHullAll(std::vector<Component>& components);
 
-std::pair<std::vector<int>, std::vector<int>> PackHulls(std::vector<Hull>& hulls, Image& image);
+void PackHulls(std::vector<Hull>& hulls, int width, int height, int* hulls_indxs, int* pixels_indxs);
 
 std::vector<Hull> UnpackHulls(std::vector<int>& hulls_indexes, std::vector<int>& pixels_indexes, int height, int width,
                               size_t hulls_size);

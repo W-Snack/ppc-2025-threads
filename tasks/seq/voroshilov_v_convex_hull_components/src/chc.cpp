@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstddef>
 #include <stack>
-#include <utility>
 #include <vector>
 
 using namespace voroshilov_v_convex_hull_components_seq;
@@ -114,10 +113,10 @@ std::vector<Pixel> voroshilov_v_convex_hull_components_seq::QuickHull(Component&
   Pixel right = component.pixels[0];
 
   for (Pixel& pixel : component.pixels) {
-    if (pixel.x < left.x) {
+    if ((pixel.x < left.x) || (pixel.x == left.x && pixel.y < left.y)) {
       left = pixel;
     }
-    if (pixel.x > right.x) {
+    if ((pixel.x > right.x) || (pixel.x == right.x && pixel.y > right.y)) {
       right = pixel;
     }
   }
@@ -172,27 +171,22 @@ std::vector<Hull> voroshilov_v_convex_hull_components_seq::QuickHullAll(std::vec
   return hulls;
 }
 
-std::pair<std::vector<int>, std::vector<int>> voroshilov_v_convex_hull_components_seq::PackHulls(
-    std::vector<Hull>& hulls, Image& image) {
-  int height = image.height;
-  int width = image.width;
-
-  std::vector<int> hulls_indexes(height * width, 0);
-  std::vector<int> pixels_indexes(height * width, 0);
+void voroshilov_v_convex_hull_components_seq::PackHulls(std::vector<Hull>& hulls, int width, int height,
+                                                        int* hulls_indxs, int* pixels_indxs) {
+  std::fill(hulls_indxs, hulls_indxs + (height * width), 0);
+  std::fill(pixels_indxs, pixels_indxs + (height * width), 0);
 
   int hull_index = 1;
   for (Hull& hull : hulls) {
     int pixel_index = 1;
-    for (Pixel& pixel : hull.pixels) {
-      hulls_indexes[(pixel.y * width) + pixel.x] = hull_index;
-      pixels_indexes[(pixel.y * width) + pixel.x] = pixel_index;
+    for (Pixel& p : hull.pixels) {
+      int pos = (p.y * width) + p.x;
+      hulls_indxs[pos] = hull_index;
+      pixels_indxs[pos] = pixel_index;
       pixel_index++;
     }
     hull_index++;
   }
-
-  std::pair<std::vector<int>, std::vector<int>> packed_vectors(hulls_indexes, pixels_indexes);
-  return packed_vectors;
 }
 
 std::vector<Hull> voroshilov_v_convex_hull_components_seq::UnpackHulls(std::vector<int>& hulls_indexes,

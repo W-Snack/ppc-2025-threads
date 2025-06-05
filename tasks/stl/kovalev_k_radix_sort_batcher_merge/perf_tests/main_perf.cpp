@@ -17,11 +17,14 @@
 const long long int kMinLl = std::numeric_limits<long long>::lowest(), kMaxLl = std::numeric_limits<long long>::max();
 
 TEST(kovalev_k_radix_sort_batcher_merge_stl, test_pipeline_run) {
-  const unsigned int length = 20000000;
-  std::srand(std::time(nullptr));
-  const int alpha = rand();
-  std::vector<long long int> in(length, alpha);
+  const unsigned int length = 15000000;
+  std::vector<long long int> in(length);
   std::vector<long long int> out(length);
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<long long int> dis(kMinLl, kMaxLl);
+  std::ranges::generate(in.begin(), in.end(), [&]() { return dis(gen); });
+  std::vector<long long int> etalon(in);
   std::shared_ptr<ppc::core::TaskData> task_data_stl = std::make_shared<ppc::core::TaskData>();
   task_data_stl->inputs.emplace_back(reinterpret_cast<uint8_t *>(in.data()));
   task_data_stl->inputs_count.emplace_back(in.size());
@@ -40,10 +43,11 @@ TEST(kovalev_k_radix_sort_batcher_merge_stl, test_pipeline_run) {
   auto perf_analyzer = std::make_shared<ppc::core::Perf>(test_task_stl);
   perf_analyzer->PipelineRun(perf_attr, perf_results);
   ppc::core::Perf::PrintPerfStatistic(perf_results);
+  std::ranges::sort(etalon.begin(), etalon.end(), [](long long int a, long long int b) { return a < b; });
   auto *tmp = reinterpret_cast<long long int *>(out.data());
   int count_viol = 0;
   for (unsigned int i = 0; i < length; i++) {
-    if (tmp[i] != in[i]) {
+    if (tmp[i] != etalon[i]) {
       count_viol++;
     }
   }
@@ -51,7 +55,7 @@ TEST(kovalev_k_radix_sort_batcher_merge_stl, test_pipeline_run) {
 }
 
 TEST(kovalev_k_radix_sort_batcher_merge_stl, test_task_run) {
-  const unsigned int length = 20000000;
+  const unsigned int length = 15000000;
   std::vector<long long int> in(length);
   std::vector<long long int> out(length);
   std::random_device rd;
